@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="TranscriptService.Application/TranscriptService.Application.csproj" />
+  <Project Path="TranscriptService.Domain/TranscriptService.Domain.csproj" />
+  <Project Path="TranscriptService.Infrastructure/TranscriptService.Infrastructure.csproj" />
+  <Project Path="TranscriptService.Worker/TranscriptService.Worker.csproj" />
+</Solution>
