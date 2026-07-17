@@ -10,8 +10,11 @@ public partial class RecordingChunkMapper : MapperBase
 {
     // ---- RecordingChunk ----
     [MapperIgnoreSource(nameof(RecordingChunkDto.HasWavPath))]
+    [MapperIgnoreSource(nameof(RecordingChunkDto.HasTranscriptPath))]
+    [MapperIgnoreSource(nameof(RecordingChunkDto.TranscriptPath))]
     public partial RecordingChunk ToDomain(RecordingChunkDto dto);
-
+    
+    [MapperIgnoreTarget(nameof(RecordingChunkDto.TranscriptPath))]
     public partial RecordingChunkDto ToDto(RecordingChunk entity);
 
     // ---- List mapping (used for GetRecordingChunkResponse's repeated field) ----
