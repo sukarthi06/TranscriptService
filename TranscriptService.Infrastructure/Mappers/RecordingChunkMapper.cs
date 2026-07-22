@@ -8,13 +8,17 @@ namespace TranscriptService.Infrastructure.Mappers;
 [Mapper]
 public partial class RecordingChunkMapper : MapperBase
 {
-    // ---- RecordingChunk ----
-    [MapperIgnoreSource(nameof(RecordingChunkDto.HasWavPath))]
-    [MapperIgnoreSource(nameof(RecordingChunkDto.HasTranscriptPath))]
+    // ---- RecordingChunk ----    
+    [MapperIgnoreSource(nameof(RecordingChunkDto.StartTime))]
+    [MapperIgnoreSource(nameof(RecordingChunkDto.EndTime))]
+    [MapperIgnoreSource(nameof(RecordingChunkDto.ChunkDuration))]
     [MapperIgnoreSource(nameof(RecordingChunkDto.TranscriptPath))]
     public partial RecordingChunk ToDomain(RecordingChunkDto dto);
     
     [MapperIgnoreTarget(nameof(RecordingChunkDto.TranscriptPath))]
+    [MapperIgnoreTarget(nameof(RecordingChunkDto.StartTime))]
+    [MapperIgnoreTarget(nameof(RecordingChunkDto.EndTime))]
+    [MapperIgnoreTarget(nameof(RecordingChunkDto.ChunkDuration))]
     public partial RecordingChunkDto ToDto(RecordingChunk entity);
 
     // ---- List mapping (used for GetRecordingChunkResponse's repeated field) ----

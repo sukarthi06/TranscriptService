@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.IO;
 using System.Buffers;
 using TranscriptService.Application.Interfaces;
 using TranscriptService.Domain.ValueObjects;
@@ -10,9 +11,9 @@ namespace TranscriptService.Application.Services;
 public class ChunkProcessor(
     IRecordingChunkServices recordingChunkService,
     IAudioObjectStorage storage,
+    RecyclableMemoryStreamManager streamManager,
     ILogger<ChunkProcessor> logger) : IChunkProcessor
 {
-    private const int ChunkSizeBytes = 4 * 1024 * 1024;
     private const int OverlapSizeBytes = 512 * 1024;
 
     public async Task<IMemoryOwner<byte>> ProcessChunkAsync(ChunkId chunkId, CancellationToken ct)
@@ -40,25 +41,34 @@ public class ChunkProcessor(
             storagePath = chunks[1].StoragePath;
         }
 
-        var bufferStorage = ArrayPool<byte>.Shared.Rent(ChunkSizeBytes);
+        byte[]? storageBytes = null;
         byte[]? bufferOverlap = null;
 
         try
         {
-            // --- Read main chunk ---
+            // --- Read main chunk to EOF (size not known up front) ---
             int storageBytesRead;
             try
             {
                 await using var storageReader = await storage.OpenReadStreamAsync(storagePath, ct);
+                await using var readStream = streamManager.GetStream("chunk-read");
+
+                // Grows via pooled segments internally - no fixed ceiling, reads until true EOF.
+                await storageReader.CopyToAsync(readStream, ct);
+                storageBytesRead = (int)readStream.Length;
+
+                // Copy out into a right-sized pooled array now that we know the real length,
+                // since callers expect a contiguous pooled buffer via PooledArrayMemoryOwner.
+                storageBytes = ArrayPool<byte>.Shared.Rent(storageBytesRead);
+                readStream.Position = 0; // must reset before reading back out
 
                 int offset = 0;
                 int bytesRead;
-                while (offset < ChunkSizeBytes &&
-                       (bytesRead = await storageReader.ReadAsync(bufferStorage.AsMemory(offset, ChunkSizeBytes - offset), ct)) > 0)
+                while (offset < storageBytesRead &&
+                       (bytesRead = await readStream.ReadAsync(storageBytes.AsMemory(offset, storageBytesRead - offset), ct)) > 0)
                 {
                     offset += bytesRead;
                 }
-                storageBytesRead = offset;
 
                 logger.LogDebug("Fetched {BytesRead} bytes for chunkId {ChunkId} from storage path {StoragePath}.",
                     storageBytesRead, chunkId, storagePath);
@@ -71,9 +81,9 @@ public class ChunkProcessor(
 
             if (!hasOverlap)
             {
-                // Caller owns this - it will Dispose() to return bufferStorage to the pool
-                var owner = new PooledArrayMemoryOwner(bufferStorage, storageBytesRead);
-                bufferStorage = null!; // prevent our finally block from also returning it
+                // Caller owns this - it will Dispose() to return storageBytes to the pool
+                var owner = new PooledArrayMemoryOwner(storageBytes, storageBytesRead);
+                storageBytes = null!; // prevent our finally block from also returning it
                 return owner;
             }
 
@@ -104,14 +114,14 @@ public class ChunkProcessor(
             var combined = ArrayPool<byte>.Shared.Rent(totalLength);
 
             Buffer.BlockCopy(bufferOverlap, 0, combined, 0, overlapBytesRead);
-            Buffer.BlockCopy(bufferStorage, 0, combined, overlapBytesRead, storageBytesRead);
+            Buffer.BlockCopy(storageBytes, 0, combined, overlapBytesRead, storageBytesRead);
 
             return new PooledArrayMemoryOwner(combined, totalLength);
         }
         finally
         {
-            // bufferStorage is nulled out above if ownership was transferred to the caller
-            if (bufferStorage != null) ArrayPool<byte>.Shared.Return(bufferStorage);
+            // storageBytes is nulled out above if ownership was transferred to the caller
+            if (storageBytes != null) ArrayPool<byte>.Shared.Return(storageBytes);
             if (bufferOverlap != null) ArrayPool<byte>.Shared.Return(bufferOverlap);
         }
     }
