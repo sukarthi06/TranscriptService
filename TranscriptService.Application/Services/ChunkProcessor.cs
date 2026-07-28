@@ -70,8 +70,8 @@ public class ChunkProcessor(
                     offset += bytesRead;
                 }
 
-                logger.LogDebug("Fetched {BytesRead} bytes for chunkId {ChunkId} from storage path {StoragePath}.",
-                    storageBytesRead, chunkId, storagePath);
+                //logger.LogInformation("Fetched {BytesRead} bytes for chunkId {ChunkId} from storage path {StoragePath}.",
+                //    storageBytesRead, chunkId, storagePath);
             }
             catch
             {
@@ -107,7 +107,7 @@ public class ChunkProcessor(
                 overlapBytesRead = offset;
             }
 
-            logger.LogDebug("Fetched {BytesRead} bytes from overlap path {OverlapPath}.", overlapBytesRead, overlapPath);
+            //logger.LogInformation("Fetched {BytesRead} bytes from overlap path {OverlapPath}.", overlapBytesRead, overlapPath);
 
             // --- Combine overlap + storage into the final owned buffer ---
             int totalLength = overlapBytesRead + storageBytesRead;
