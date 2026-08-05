@@ -25,6 +25,8 @@ public class RabbitMqConsumer(
     {
         var host = config["RabbitMQ:Host"] ?? throw new InvalidOperationException("Configuration value 'RabbitMQ:Host' is missing.");
         var port = int.Parse(config["RabbitMQ:Port"] ?? "5672");
+        var virtualHost = config["RabbitMQ:VirtualHost"];
+        virtualHost = string.IsNullOrWhiteSpace(virtualHost) ? "/" : virtualHost;
         var prefetchCount = ushort.Parse(config["RabbitMQ:PrefetchCount"] ?? "1");
 
         try
@@ -33,11 +35,18 @@ public class RabbitMqConsumer(
             {
                 HostName = host,
                 Port = port,
+                VirtualHost = virtualHost,
                 UserName = config["RabbitMQ:Username"]
                     ?? throw new InvalidOperationException("Configuration value 'RabbitMQ:Username' is missing."),
                 Password = config["RabbitMQ:Password"]
                     ?? throw new InvalidOperationException("Configuration value 'RabbitMQ:Password' is missing.")
             };
+
+            // CloudAMQP/LavinMQ require TLS on the standard AMQPS port.
+            if (port == 5671)
+            {
+                factory.Ssl = new SslOption { Enabled = true, ServerName = host };
+            }
 
             var connection = await factory.CreateConnectionAsync();
             var channel = await connection.CreateChannelAsync();
